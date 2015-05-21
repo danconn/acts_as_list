@@ -35,7 +35,13 @@ module ActiveRecord
         # * +add_new_at+ - specifies whether objects get added to the :top or :bottom of the list. (default: +bottom+)
         #                   `nil` will result in new items not being added to the list on create
         def acts_as_list(options = {})
-          configuration = { column: "position", scope: "1 = 1", top_of_list: 1, add_new_at: :bottom}
+          configuration = {
+            column: "position",
+            scope: "1 = 1",
+            top_of_list: 1,
+            add_new_at: :bottom,
+            increment: 1
+          }
           configuration.update(options) if options.is_a?(Hash)
 
           configuration[:scope] = "#{configuration[:scope]}_id".intern if configuration[:scope].is_a?(Symbol) && configuration[:scope].to_s !~ /_id$/
@@ -93,6 +99,10 @@ module ActiveRecord
 
             def scope_name
               '#{configuration[:scope]}'
+            end
+
+            def increment
+              #{configuration[:increment]}
             end
 
             def add_new_at
@@ -197,13 +207,13 @@ module ActiveRecord
         # Increase the position of this item without adjusting the rest of the list.
         def increment_position
           return unless in_list?
-          set_list_position(self.send(position_column).to_i + 1)
+          set_list_position(self.send(position_column).to_i + increment)
         end
 
         # Decrease the position of this item without adjusting the rest of the list.
         def decrement_position
           return unless in_list?
-          set_list_position(self.send(position_column).to_i - 1)
+          set_list_position(self.send(position_column).to_i - increment)
         end
 
         # Return +true+ if this object is the first in the list.
@@ -297,7 +307,7 @@ module ActiveRecord
 
           def add_to_list_bottom
             if not_in_list? || scope_changed? && !@position_changed || default_position?
-              self[position_column] = bottom_position_in_list.to_i + 1
+              self[position_column] = bottom_position_in_list.to_i + increment
             else
               increment_positions_on_lower_items(self[position_column], id)
             end
@@ -310,7 +320,7 @@ module ActiveRecord
           #   bottom_position_in_list    # => 2
           def bottom_position_in_list(except = nil)
             item = bottom_item(except)
-            item ? item.send(position_column) : acts_as_list_top - 1
+            item ? item.send(position_column) : acts_as_list_top - increment
           end
 
           # Returns the bottom item
@@ -324,7 +334,7 @@ module ActiveRecord
 
           # Forces item to assume the bottom position in the list.
           def assume_bottom_position
-            set_list_position(bottom_position_in_list(self).to_i + 1)
+            set_list_position(bottom_position_in_list(self).to_i + increment)
           end
 
           # Forces item to assume the top position in the list.
@@ -338,7 +348,7 @@ module ActiveRecord
               acts_as_list_class.where(scope_condition).where(
                 "#{position_column} <= #{position}"
               ).update_all(
-                "#{position_column} = (#{position_column} - 1)"
+                "#{position_column} = (#{position_column} - #{increment})"
               )
             end
           end
@@ -351,7 +361,7 @@ module ActiveRecord
               acts_as_list_class.where(scope_condition).where(
                 "#{position_column} > #{position}"
               ).update_all(
-                "#{position_column} = (#{position_column} - 1)"
+                "#{position_column} = (#{position_column} - #{increment})"
               )
             end
           end
@@ -363,7 +373,7 @@ module ActiveRecord
               acts_as_list_class.where(scope_condition).where(
                 "#{position_column} < #{send(position_column).to_i}"
               ).update_all(
-                "#{position_column} = (#{position_column} + 1)"
+                "#{position_column} = (#{position_column} + #{increment})"
               )
             end
           end
@@ -376,7 +386,7 @@ module ActiveRecord
               acts_as_list_class.where(scope_condition).where(
                 "#{position_column} >= #{position}#{avoid_id_condition}"
               ).update_all(
-                "#{position_column} = (#{position_column} + 1)"
+                "#{position_column} = (#{position_column} + #{increment})"
               )
             end
           end
@@ -387,7 +397,7 @@ module ActiveRecord
               acts_as_list_class.where(
                 scope_condition
               ).update_all(
-                "#{position_column} = (#{position_column} + 1)"
+                "#{position_column} = (#{position_column} + #{increment})"
               )
             end
           end
@@ -408,7 +418,7 @@ module ActiveRecord
                 ).where(
                   "#{position_column} <= #{new_position}#{avoid_id_condition}"
                 ).update_all(
-                  "#{position_column} = (#{position_column} - 1)"
+                  "#{position_column} = (#{position_column} - #{increment})"
                 )
               end
             else
@@ -422,7 +432,7 @@ module ActiveRecord
                 ).where(
                   "#{position_column} < #{old_position}#{avoid_id_condition}"
                 ).update_all(
-                  "#{position_column} = (#{position_column} + 1)"
+                  "#{position_column} = (#{position_column} + #{increment})"
                 )
               end
             end
